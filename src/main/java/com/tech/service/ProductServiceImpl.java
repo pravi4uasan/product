@@ -1,15 +1,12 @@
 package com.tech.service;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -19,7 +16,7 @@ import com.tech.models.ReviewResponse;
 
 import lombok.extern.slf4j.Slf4j;
 
-@Component
+@Service
 @Slf4j
 public class ProductServiceImpl implements ProductService{
 	@Autowired
@@ -30,6 +27,7 @@ public class ProductServiceImpl implements ProductService{
 
 	@Value("${api.adidas.url}")
 	private String adidasURL;
+	
 
 
 
@@ -38,8 +36,6 @@ public class ProductServiceImpl implements ProductService{
 		log.info("START getProductDetailsById adidasURL >>"+adidasURL);
 		ProductResponseVO productResponseVO=new ProductResponseVO();
 		ReviewResponse reviewResponse=new ReviewResponse();
-		ProductDetailsVO productDetailsVO=new ProductDetailsVO();
-
 		try {
 
 			reviewResponse=restTemplate.getForObject(reviewURL+productId, ReviewResponse.class);
@@ -53,13 +49,29 @@ public class ProductServiceImpl implements ProductService{
 				productResponseVO.setAvgReviewScore(reviewResponse.getAvgReviewScore());
 			}
 
-			productDetailsVO=restTemplate.getForObject(adidasURL+productId, ProductDetailsVO.class);
-			log.info("productDetailsVO >>"+productDetailsVO);
-			if(null!=productDetailsVO) {
-				productResponseVO.setModel_number(productDetailsVO.getModel_number()); 
-				productResponseVO.setName(productDetailsVO.getName());
-				productResponseVO.setProduct_type(productDetailsVO.getProduct_type());
-				productResponseVO.setRecommendationsEnabled(productDetailsVO.isRecommendationsEnabled());
+			//productDetailsVO=restTemplate.getForObject("http://www.adidas.co.uk/api/products/BB5476", ProductDetailsVO.class);
+			RestTemplate restTemplateAdidas=new RestTemplate();
+			HttpHeaders headers = new HttpHeaders();
+			headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101");
+			HttpEntity entity = new HttpEntity(headers);
+			ResponseEntity<ProductDetailsVO> response = restTemplateAdidas.exchange(
+					adidasURL+productId, HttpMethod.GET, entity, ProductDetailsVO.class);
+			
+			log.info("response.getStatusCode() >>"+response.getStatusCode());
+			log.info("body >>"+response.getBody());
+			
+			
+			//log.info("productDetailsVO >>"+productDetailsVO);
+			if(HttpStatus.OK.equals(response.getStatusCode()) && null!=response.getBody()) {
+				productResponseVO.setModel_number(response.getBody().getModel_number()); 
+				productResponseVO.setName(response.getBody().getName());
+				productResponseVO.setProduct_type(response.getBody().getProduct_type());
+				productResponseVO.setRecommendationsEnabled(response.getBody().isRecommendationsEnabled());
+				
+				productResponseVO.setMetaData(response.getBody().getMetaData());
+				productResponseVO.setProductDescription(response.getBody().getProductDescription());
+				productResponseVO.setPricingInformation(response.getBody().getPricingInformation());
+				
 			}
 		}catch(Exception e) {
 			log.error("Error while service api call :", e);
